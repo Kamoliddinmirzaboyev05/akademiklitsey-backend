@@ -141,12 +141,14 @@ class NewsWriteSerializer(serializers.Serializer):
     )
 
     def validate(self, data):
-        titles = [
-            data.get('title_uz', ''),
-            data.get('title_ru', ''),
-            data.get('title_en', ''),
-            data.get('title_uz_cyrl', ''),
-        ]
+        if self.partial:
+            instance = self.instance
+            titles = [
+                data.get(f'title_{l}') or (getattr(instance, f'title_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            titles = [data.get(f'title_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
         if not any(titles):
             raise serializers.ValidationError(
                 "Kamida bitta tilda sarlavha kiritilishi shart (title_uz, title_ru yoki title_en)."
@@ -277,12 +279,14 @@ class AnnouncementWriteSerializer(serializers.Serializer):
     )
 
     def validate(self, data):
-        titles = [
-            data.get('title_uz', ''),
-            data.get('title_ru', ''),
-            data.get('title_en', ''),
-            data.get('title_uz_cyrl', ''),
-        ]
+        if self.partial:
+            instance = self.instance
+            titles = [
+                data.get(f'title_{l}') or (getattr(instance, f'title_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            titles = [data.get(f'title_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
         if not any(titles):
             raise serializers.ValidationError(
                 "Kamida bitta tilda sarlavha kiritilishi shart (title_uz, title_ru yoki title_en)."

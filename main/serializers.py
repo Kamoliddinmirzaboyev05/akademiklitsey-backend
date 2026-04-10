@@ -96,12 +96,14 @@ class StatisticWriteSerializer(serializers.Serializer):
         return value
 
     def validate(self, data):
-        labels = [
-            data.get('label_uz', ''),
-            data.get('label_ru', ''),
-            data.get('label_en', ''),
-            data.get('label_uz_cyrl', ''),
-        ]
+        if self.partial:
+            instance = self.instance
+            labels = [
+                data.get(f'label_{l}') or (getattr(instance, f'label_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            labels = [data.get(f'label_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
         if not any(labels):
             raise serializers.ValidationError(
                 "Kamida bitta tilda yorliq kiritilishi shart (label_uz, label_ru yoki label_en)."

@@ -133,6 +133,7 @@ class DepartmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @swagger_auto_schema(
         operation_summary="Kafedrani to'liq yangilash",
+        operation_description="Faqat admin. **`multipart/form-data`** yoki JSON orqali yuboriladi.",
         request_body=DepartmentWriteSerializer,
         responses={200: DepartmentDetailSerializer},
         tags=["Structure - Departments"],
@@ -146,6 +147,7 @@ class DepartmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @swagger_auto_schema(
         operation_summary="Kafedrani qisman yangilash",
+        operation_description="Faqat admin. Faqat o'zgartiriladigan maydonlarni yuboring.",
         request_body=DepartmentWriteSerializer,
         responses={200: DepartmentDetailSerializer},
         tags=["Structure - Departments"],
@@ -298,7 +300,27 @@ class TeacherDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @swagger_auto_schema(
         operation_summary="O'qituvchini to'liq yangilash",
-        request_body=TeacherWriteSerializer,
+        operation_description="Faqat admin. **`multipart/form-data`** orqali yuboriladi.",
+        manual_parameters=[
+            openapi.Parameter('full_name', openapi.IN_FORM, type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter('position_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('subject_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('subject_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('achievements_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('academic_degree', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('category', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, enum=['highest','first','second','none']),
+            openapi.Parameter('experience_years', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('department', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('photo', openapi.IN_FORM, type=openapi.TYPE_FILE, required=False),
+            openapi.Parameter('email', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+        ],
+        consumes=['multipart/form-data'],
         responses={200: TeacherSerializer},
         tags=["Structure - Teachers"],
     )
@@ -311,7 +333,27 @@ class TeacherDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @swagger_auto_schema(
         operation_summary="O'qituvchini qisman yangilash",
-        request_body=TeacherWriteSerializer,
+        operation_description="Faqat admin. **`multipart/form-data`** orqali yuboriladi. Faqat o'zgartiriladigan maydonlarni yuboring.",
+        manual_parameters=[
+            openapi.Parameter('full_name', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('subject_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('subject_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('achievements_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('academic_degree', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('category', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, enum=['highest','first','second','none']),
+            openapi.Parameter('experience_years', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('department', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('photo', openapi.IN_FORM, type=openapi.TYPE_FILE, required=False),
+            openapi.Parameter('email', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+        ],
+        consumes=['multipart/form-data'],
         responses={200: TeacherSerializer},
         tags=["Structure - Teachers"],
     )
@@ -469,7 +511,24 @@ class ManagementDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @swagger_auto_schema(
         operation_summary="Rahbarni to'liq yangilash",
-        request_body=ManagementWriteSerializer,
+        operation_description="Faqat admin. **`multipart/form-data`** orqali yuboriladi.",
+        manual_parameters=[
+            openapi.Parameter('full_name', openapi.IN_FORM, type=openapi.TYPE_STRING, required=True),
+            openapi.Parameter('position_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('reception_hours_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('reception_hours_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('academic_degree', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('phone', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('email', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('photo', openapi.IN_FORM, type=openapi.TYPE_FILE, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+        ],
+        consumes=['multipart/form-data'],
         responses={200: ManagementSerializer},
         tags=["Structure - Management"],
     )
@@ -482,7 +541,24 @@ class ManagementDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     @swagger_auto_schema(
         operation_summary="Rahbarni qisman yangilash",
-        request_body=ManagementWriteSerializer,
+        operation_description="Faqat admin. **`multipart/form-data`** orqali yuboriladi. Faqat o'zgartiriladigan maydonlarni yuboring.",
+        manual_parameters=[
+            openapi.Parameter('full_name', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('position_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('bio_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('reception_hours_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('reception_hours_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('academic_degree', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('phone', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('email', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False),
+            openapi.Parameter('photo', openapi.IN_FORM, type=openapi.TYPE_FILE, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+        ],
+        consumes=['multipart/form-data'],
         responses={200: ManagementSerializer},
         tags=["Structure - Management"],
     )

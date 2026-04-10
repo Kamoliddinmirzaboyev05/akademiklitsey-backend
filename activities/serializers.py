@@ -167,12 +167,14 @@ class CircleWriteSerializer(serializers.Serializer):
             )
 
     def validate(self, data):
-        names = [
-            data.get('name_uz', ''),
-            data.get('name_ru', ''),
-            data.get('name_en', ''),
-            data.get('name_uz_cyrl', ''),
-        ]
+        if self.partial:
+            instance = self.instance
+            names = [
+                data.get(f'name_{l}') or (getattr(instance, f'name_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            names = [data.get(f'name_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
         if not any(names):
             raise serializers.ValidationError(
                 "Kamida bitta tilda to'garak nomi kiritilishi shart (name_uz, name_ru yoki name_en)."

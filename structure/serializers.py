@@ -120,11 +120,24 @@ class TeacherWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"ID={value} bo'lgan kafedra topilmadi.")
 
     def validate(self, data):
-        positions = [data.get(f'position_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
-        if not any(positions):
-            raise serializers.ValidationError(
-                "Kamida bitta tilda lavozim kiritilishi shart (position_uz, position_ru yoki position_en)."
-            )
+        # PATCH (partial=True) da mavjud instance ni ham hisobga olamiz
+        if not self.partial:
+            positions = [data.get(f'position_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
+            if not any(positions):
+                raise serializers.ValidationError(
+                    "Kamida bitta tilda lavozim kiritilishi shart (position_uz, position_ru yoki position_en)."
+                )
+        else:
+            # PATCH: faqat yangi data yuborilgan bo'lsa tekshiramiz, aks holda instance dagi mavjud qiymatlar saqlanadi
+            instance = self.instance
+            positions = [
+                data.get(f'position_{l}') or (getattr(instance, f'position_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+            if not any(positions):
+                raise serializers.ValidationError(
+                    "Kamida bitta tilda lavozim kiritilishi shart (position_uz, position_ru yoki position_en)."
+                )
         return data
 
     def create(self, validated_data):
@@ -207,11 +220,22 @@ class DepartmentWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError(f"ID={value} bo'lgan faol o'qituvchi topilmadi.")
 
     def validate(self, data):
-        names = [data.get(f'name_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
-        if not any(names):
-            raise serializers.ValidationError(
-                "Kamida bitta tilda kafedra nomi kiritilishi shart (name_uz, name_ru yoki name_en)."
-            )
+        if not self.partial:
+            names = [data.get(f'name_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
+            if not any(names):
+                raise serializers.ValidationError(
+                    "Kamida bitta tilda kafedra nomi kiritilishi shart (name_uz, name_ru yoki name_en)."
+                )
+        else:
+            instance = self.instance
+            names = [
+                data.get(f'name_{l}') or (getattr(instance, f'name_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+            if not any(names):
+                raise serializers.ValidationError(
+                    "Kamida bitta tilda kafedra nomi kiritilishi shart (name_uz, name_ru yoki name_en)."
+                )
         return data
 
     def create(self, validated_data):
@@ -277,11 +301,22 @@ class ManagementWriteSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(default=True)
 
     def validate(self, data):
-        positions = [data.get(f'position_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
-        if not any(positions):
-            raise serializers.ValidationError(
-                "Kamida bitta tilda lavozim kiritilishi shart (position_uz, position_ru yoki position_en)."
-            )
+        if not self.partial:
+            positions = [data.get(f'position_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
+            if not any(positions):
+                raise serializers.ValidationError(
+                    "Kamida bitta tilda lavozim kiritilishi shart (position_uz, position_ru yoki position_en)."
+                )
+        else:
+            instance = self.instance
+            positions = [
+                data.get(f'position_{l}') or (getattr(instance, f'position_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+            if not any(positions):
+                raise serializers.ValidationError(
+                    "Kamida bitta tilda lavozim kiritilishi shart (position_uz, position_ru yoki position_en)."
+                )
         return data
 
     def create(self, validated_data):
