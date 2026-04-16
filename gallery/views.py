@@ -10,7 +10,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from accounts.permissions import IsAdminOrReadOnly
-from .models import GalleryAlbum, GalleryPhoto, UsefulLink
+from .models import GalleryAlbum, GalleryPhoto, UsefulLink, InfrastructureItem, Video
 from .serializers import (
     GalleryAlbumSerializer,
     GalleryAlbumDetailSerializer,
@@ -20,6 +20,10 @@ from .serializers import (
     GalleryPhotoBulkUploadSerializer,
     UsefulLinkSerializer,
     UsefulLinkWriteSerializer,
+    InfrastructureItemSerializer,
+    InfrastructureItemWriteSerializer,
+    VideoSerializer,
+    VideoWriteSerializer,
     apply_lang_filter,
 )
 
@@ -606,5 +610,352 @@ class UsefulLinkDetailView(generics.RetrieveUpdateDestroyAPIView):
     def delete(self, request, *args, **kwargs):
         obj = self.get_object()
         data = {'id': obj.pk, 'name': obj.name, 'detail': "Havola muvaffaqiyatli o'chirildi."}
+        obj.delete()
+        return Response(data, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# InfrastructureItem — Litseyning moddiy-texnik bazasi
+# ─────────────────────────────────────────────────────────────────────────────
+
+INFRA_WRITE_PARAMS = [
+    openapi.Parameter('title_uz',       openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (UZ)"),
+    openapi.Parameter('title_uz_cyrl',  openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (UZ Kirill)"),
+    openapi.Parameter('title_ru',       openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (RU)"),
+    openapi.Parameter('title_en',       openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (EN)"),
+    openapi.Parameter('description_uz',      openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (UZ)"),
+    openapi.Parameter('description_uz_cyrl', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (UZ Kirill)"),
+    openapi.Parameter('description_ru',      openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (RU)"),
+    openapi.Parameter('description_en',      openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (EN)"),
+    openapi.Parameter('image',      openapi.IN_FORM, type=openapi.TYPE_FILE,    required=False, description="Rasm"),
+    openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False, default=0),
+    openapi.Parameter('is_active',  openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False, default=True),
+]
+
+
+class InfrastructureListCreateView(generics.ListCreateAPIView):
+    """Moddiy-texnik baza elementlari ro'yxati va yaratish."""
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = GalleryPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['title_uz', 'title_ru', 'title_en', 'description_uz', 'description_ru']
+    ordering_fields = ['sort_order', 'created_at']
+    ordering = ['sort_order', '-created_at']
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return InfrastructureItem.objects.none()
+        qs = InfrastructureItem.objects.all()
+        is_admin = (
+            self.request.user.is_authenticated
+            and hasattr(self.request.user, 'is_admin_role')
+            and self.request.user.is_admin_role()
+        )
+        if not is_admin:
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return InfrastructureItemSerializer
+        return InfrastructureItemWriteSerializer if self.request.method == 'POST' else InfrastructureItemSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Moddiy-texnik baza ro'yxati",
+        operation_description=(
+            "Litseyning moddiy-texnik bazasi elementlari (partalari, kompyuterlari va boshqalar).\n\n"
+            "Filterlar:\n"
+            "- `?is_active=true|false` (admin uchun)\n"
+            "- `?search=...` — nom/tavsif bo'yicha\n"
+            "- `?ordering=sort_order|-created_at`\n"
+            "- `?lang=uz|ru|en|uz_cyrl` — faqat o'sha tildagi tarjima"
+        ),
+        manual_parameters=[LANG_PARAM],
+        responses={200: InfrastructureItemSerializer(many=True)},
+        tags=["Infrastructure"],
+    )
+    def get(self, request, *args, **kwargs):
+        lang = request.query_params.get('lang')
+        qs = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            data = InfrastructureItemSerializer(page, many=True, context={'request': request}).data
+            return self.get_paginated_response(apply_lang_filter(list(data), lang))
+        data = InfrastructureItemSerializer(qs, many=True, context={'request': request}).data
+        return Response(apply_lang_filter(list(data), lang))
+
+    @swagger_auto_schema(
+        operation_summary="Yangi element yaratish",
+        operation_description=(
+            "Faqat admin. **`multipart/form-data`** orqali yuboriladi.\n\n"
+            "Kamida bitta tilda `title_*` va `image` majburiy."
+        ),
+        manual_parameters=INFRA_WRITE_PARAMS,
+        consumes=['multipart/form-data'],
+        responses={
+            201: InfrastructureItemSerializer,
+            400: openapi.Response(description="Validatsiya xatosi"),
+            403: openapi.Response(description="Ruxsat yo'q"),
+        },
+        tags=["Infrastructure"],
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = InfrastructureItemWriteSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save()
+        return Response(
+            InfrastructureItemSerializer(item, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InfrastructureDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Bitta element — ko'rish, tahrirlash, o'chirish."""
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return InfrastructureItem.objects.none()
+        return InfrastructureItem.objects.all()
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return InfrastructureItemSerializer
+        if self.request.method in ('PUT', 'PATCH'):
+            return InfrastructureItemWriteSerializer
+        return InfrastructureItemSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Element detali",
+        operation_description="Bitta moddiy-texnik baza elementi. ?lang= bilan til filtri.",
+        manual_parameters=[LANG_PARAM],
+        responses={200: InfrastructureItemSerializer, 404: openapi.Response(description="Topilmadi")},
+        tags=["Infrastructure"],
+    )
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object()
+        lang = request.query_params.get('lang')
+        data = InfrastructureItemSerializer(obj, context={'request': request}).data
+        return Response(apply_lang_filter(data, lang))
+
+    @swagger_auto_schema(
+        operation_summary="Elementni to'liq yangilash",
+        operation_description="Faqat admin. **`multipart/form-data`** orqali yuboriladi.",
+        manual_parameters=INFRA_WRITE_PARAMS,
+        consumes=['multipart/form-data'],
+        responses={200: InfrastructureItemSerializer, 400: openapi.Response(description="Validatsiya xatosi")},
+        tags=["Infrastructure"],
+    )
+    def put(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = InfrastructureItemWriteSerializer(obj, data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(InfrastructureItemSerializer(obj, context={'request': request}).data)
+
+    @swagger_auto_schema(
+        operation_summary="Elementni qisman yangilash",
+        operation_description="Faqat admin. Faqat o'zgartirilishi kerak bo'lgan maydonlar. **`multipart/form-data`**.",
+        manual_parameters=INFRA_WRITE_PARAMS,
+        consumes=['multipart/form-data'],
+        responses={200: InfrastructureItemSerializer, 400: openapi.Response(description="Validatsiya xatosi")},
+        tags=["Infrastructure"],
+    )
+    def patch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = InfrastructureItemWriteSerializer(obj, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(InfrastructureItemSerializer(obj, context={'request': request}).data)
+
+    @swagger_auto_schema(
+        operation_summary="Elementni o'chirish",
+        responses={200: openapi.Response(description="Muvaffaqiyatli o'chirildi")},
+        tags=["Infrastructure"],
+    )
+    def delete(self, request, *args, **kwargs):
+        obj = self.get_object()
+        data = {
+            'id': obj.pk,
+            'title': obj.title_uz or obj.title_ru or obj.title_en or '',
+            'detail': "Element muvaffaqiyatli o'chirildi.",
+        }
+        obj.delete()
+        return Response(data, status=status.HTTP_200_OK)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Video — Video lavhalar
+# ─────────────────────────────────────────────────────────────────────────────
+
+VIDEO_WRITE_PARAMS = [
+    openapi.Parameter('title_uz',       openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Sarlavha (UZ)"),
+    openapi.Parameter('title_uz_cyrl',  openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Sarlavha (UZ Kirill)"),
+    openapi.Parameter('title_ru',       openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Sarlavha (RU)"),
+    openapi.Parameter('title_en',       openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Sarlavha (EN)"),
+    openapi.Parameter('description_uz',      openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (UZ)"),
+    openapi.Parameter('description_uz_cyrl', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (UZ Kirill)"),
+    openapi.Parameter('description_ru',      openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (RU)"),
+    openapi.Parameter('description_en',      openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Tavsif (EN)"),
+    openapi.Parameter('video_file', openapi.IN_FORM, type=openapi.TYPE_FILE,    required=True,  description="Video fayl (mp4, webm, avi va boshqalar)"),
+    openapi.Parameter('thumbnail',  openapi.IN_FORM, type=openapi.TYPE_FILE,    required=False, description="Muqova rasmi (ixtiyoriy)"),
+    openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False, default=0),
+    openapi.Parameter('is_active',  openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False, default=True),
+]
+
+
+class VideoListCreateView(generics.ListCreateAPIView):
+    """Video lavhalar ro'yxati va yaratish."""
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    pagination_class = GalleryPagination
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['is_active']
+    search_fields = ['title_uz', 'title_ru', 'title_en', 'description_uz', 'description_ru']
+    ordering_fields = ['sort_order', 'created_at']
+    ordering = ['sort_order', '-created_at']
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Video.objects.none()
+        qs = Video.objects.all()
+        is_admin = (
+            self.request.user.is_authenticated
+            and hasattr(self.request.user, 'is_admin_role')
+            and self.request.user.is_admin_role()
+        )
+        if not is_admin:
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return VideoSerializer
+        return VideoWriteSerializer if self.request.method == 'POST' else VideoSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Video lavhalar ro'yxati",
+        operation_description=(
+            "Barcha video lavhalar.\n\n"
+            "Filterlar:\n"
+            "- `?is_active=true|false` (admin uchun)\n"
+            "- `?search=...` — sarlavha/tavsif bo'yicha\n"
+            "- `?ordering=sort_order|-created_at`\n"
+            "- `?lang=uz|ru|en|uz_cyrl` — faqat o'sha tildagi tarjima"
+        ),
+        manual_parameters=[LANG_PARAM],
+        responses={200: VideoSerializer(many=True)},
+        tags=["Gallery - Videos"],
+    )
+    def get(self, request, *args, **kwargs):
+        lang = request.query_params.get('lang')
+        qs = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            data = VideoSerializer(page, many=True, context={'request': request}).data
+            return self.get_paginated_response(apply_lang_filter(list(data), lang))
+        data = VideoSerializer(qs, many=True, context={'request': request}).data
+        return Response(apply_lang_filter(list(data), lang))
+
+    @swagger_auto_schema(
+        operation_summary="Yangi video yaratish",
+        operation_description=(
+            "Faqat admin. **`multipart/form-data`** orqali yuboriladi.\n\n"
+            "Kamida bitta tilda `title_*` va `video_url` majburiy."
+        ),
+        manual_parameters=VIDEO_WRITE_PARAMS,
+        consumes=['multipart/form-data'],
+        responses={
+            201: VideoSerializer,
+            400: openapi.Response(description="Validatsiya xatosi"),
+            403: openapi.Response(description="Ruxsat yo'q"),
+        },
+        tags=["Gallery - Videos"],
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = VideoWriteSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        video = serializer.save()
+        return Response(
+            VideoSerializer(video, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class VideoDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Bitta video — ko'rish, tahrirlash, o'chirish."""
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Video.objects.none()
+        return Video.objects.all()
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return VideoSerializer
+        if self.request.method in ('PUT', 'PATCH'):
+            return VideoWriteSerializer
+        return VideoSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Video detali",
+        operation_description="Bitta video lavha. ?lang= bilan til filtri.",
+        manual_parameters=[LANG_PARAM],
+        responses={200: VideoSerializer, 404: openapi.Response(description="Topilmadi")},
+        tags=["Gallery - Videos"],
+    )
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object()
+        lang = request.query_params.get('lang')
+        data = VideoSerializer(obj, context={'request': request}).data
+        return Response(apply_lang_filter(data, lang))
+
+    @swagger_auto_schema(
+        operation_summary="Videoni to'liq yangilash",
+        operation_description="Faqat admin. **`multipart/form-data`** orqali yuboriladi.",
+        manual_parameters=VIDEO_WRITE_PARAMS,
+        consumes=['multipart/form-data'],
+        responses={200: VideoSerializer, 400: openapi.Response(description="Validatsiya xatosi")},
+        tags=["Gallery - Videos"],
+    )
+    def put(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = VideoWriteSerializer(obj, data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(VideoSerializer(obj, context={'request': request}).data)
+
+    @swagger_auto_schema(
+        operation_summary="Videoni qisman yangilash",
+        operation_description="Faqat admin. Faqat o'zgartirilishi kerak bo'lgan maydonlar. **`multipart/form-data`**.",
+        manual_parameters=VIDEO_WRITE_PARAMS,
+        consumes=['multipart/form-data'],
+        responses={200: VideoSerializer, 400: openapi.Response(description="Validatsiya xatosi")},
+        tags=["Gallery - Videos"],
+    )
+    def patch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = VideoWriteSerializer(obj, data=request.data, partial=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(VideoSerializer(obj, context={'request': request}).data)
+
+    @swagger_auto_schema(
+        operation_summary="Videoni o'chirish",
+        responses={200: openapi.Response(description="Muvaffaqiyatli o'chirildi")},
+        tags=["Gallery - Videos"],
+    )
+    def delete(self, request, *args, **kwargs):
+        obj = self.get_object()
+        data = {
+            'id': obj.pk,
+            'title': obj.title_uz or obj.title_ru or obj.title_en or '',
+            'detail': "Video muvaffaqiyatli o'chirildi.",
+        }
         obj.delete()
         return Response(data, status=status.HTTP_200_OK)

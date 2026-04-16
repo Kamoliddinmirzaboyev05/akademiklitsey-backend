@@ -10,7 +10,7 @@ from django.conf.urls.static import static
 schema_view = get_schema_view(
     openapi.Info(
         title="Academik Litsey API",
-        default_version='v2',
+        default_version='v3',
         description="Test description",
         terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="contact@snippets.local"),
@@ -29,6 +29,8 @@ urlpatterns = [
     path('', include('activities.urls', namespace='activities')),
     path('', include('admission.urls', namespace='admission')),
     path('', include('gallery.urls', namespace='gallery')),
+    path('', include('contact.urls', namespace='contact')),
+    path('', include('library.urls', namespace='library')),
 ]
 
 urlpatterns += [

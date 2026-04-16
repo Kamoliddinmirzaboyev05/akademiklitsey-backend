@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Department, Teacher, Management
+from core.validators import validate_image
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
 
@@ -110,7 +111,7 @@ class TeacherWriteSerializer(serializers.Serializer):
     category = serializers.ChoiceField(choices=Teacher.Category.choices, default=Teacher.Category.NONE)
     experience_years = serializers.IntegerField(required=False, allow_null=True, min_value=0)
     department = serializers.IntegerField(required=False, allow_null=True, help_text="Kafedra ID si")
-    photo = serializers.ImageField(required=False, allow_null=True, help_text="Rasm (multipart/form-data)")
+    photo = serializers.ImageField(required=False, allow_null=True, help_text="Rasm (multipart/form-data). Maks: 8 MB.")
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
     is_active = serializers.BooleanField(default=True)
     sort_order = serializers.IntegerField(default=0)
@@ -122,6 +123,9 @@ class TeacherWriteSerializer(serializers.Serializer):
             return Department.objects.get(pk=value)
         except Department.DoesNotExist:
             raise serializers.ValidationError(f"ID={value} bo'lgan kafedra topilmadi.")
+
+    def validate_photo(self, value):
+        return validate_image(value)
 
     def validate(self, data):
         # PATCH (partial=True) da mavjud instance ni ham hisobga olamiz
@@ -300,9 +304,12 @@ class ManagementWriteSerializer(serializers.Serializer):
     academic_degree = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True, allow_null=True)
     email = serializers.EmailField(required=False, allow_blank=True, allow_null=True)
-    photo = serializers.ImageField(required=False, allow_null=True, help_text="Rasm (multipart/form-data)")
+    photo = serializers.ImageField(required=False, allow_null=True, help_text="Rasm (multipart/form-data). Maks: 8 MB.")
     sort_order = serializers.IntegerField(default=0)
     is_active = serializers.BooleanField(default=True)
+
+    def validate_photo(self, value):
+        return validate_image(value)
 
     def validate(self, data):
         if not self.partial:

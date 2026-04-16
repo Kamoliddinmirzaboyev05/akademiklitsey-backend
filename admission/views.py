@@ -14,7 +14,7 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 from accounts.permissions import IsAdminOrReadOnly
-from .models import AdmissionInfo, AdmissionSubject, AdmissionDocument, FAQ
+from .models import AdmissionInfo, AdmissionSubject, AdmissionDocument, FAQ, DarsJadvali
 from .serializers import (
     AdmissionInfoSerializer,
     AdmissionInfoWriteSerializer,
@@ -24,6 +24,8 @@ from .serializers import (
     AdmissionDocumentWriteSerializer,
     FAQSerializer,
     FAQWriteSerializer,
+    DarsJadvaliSerializer,
+    DarsJadvaliWriteSerializer,
 )
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
@@ -706,5 +708,162 @@ class FAQDetailView(generics.RetrieveUpdateDestroyAPIView):
         obj.delete()
         return Response(
             {'id': obj.id, 'question': q[:80], 'detail': "FAQ muvaffaqiyatli o'chirildi."},
+            status=status.HTTP_200_OK,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DarsJadvali
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DarsJadvaliListView(generics.ListCreateAPIView):
+    """
+    Dars jadvallari ro'yxati va yaratish.
+    GET  — hamma uchun ochiq (faqat faollar)
+    POST — faqat admin
+    """
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [filters.OrderingFilter]
+    ordering = ['sort_order']
+
+    def get_queryset(self):
+        qs = DarsJadvali.objects.all()
+        if self.request.method == 'GET' and not (
+            self.request.user and self.request.user.is_staff
+        ):
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return DarsJadvaliSerializer
+        return DarsJadvaliWriteSerializer if self.request.method == 'POST' else DarsJadvaliSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Dars jadvallari ro'yxati",
+        operation_description="Faol dars jadvallari ro'yxati. Admin uchun barcha yozuvlar.",
+        manual_parameters=[LANG_PARAM],
+        responses={200: DarsJadvaliSerializer(many=True)},
+        tags=['Dars Jadvali'],
+    )
+    def get(self, request, *args, **kwargs):
+        lang = request.query_params.get('lang')
+        qs = self.get_queryset()
+        data = DarsJadvaliSerializer(qs, many=True, context={'request': request}).data
+        return Response(apply_lang_filter(data, lang))
+
+    @swagger_auto_schema(
+        operation_summary="Yangi dars jadvali yaratish",
+        operation_description=(
+            "Faqat admin. **`multipart/form-data`** orqali yuboriladi.\n\n"
+            "Kamida bitta tilda `title_*` va `file` majburiy."
+        ),
+        manual_parameters=[
+            openapi.Parameter('title_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=True, description="Nomi (UZ), masalan: 1-kurs"),
+            openapi.Parameter('title_uz_cyrl', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (UZ Kirill)"),
+            openapi.Parameter('title_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (RU)"),
+            openapi.Parameter('title_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (EN)"),
+            openapi.Parameter('file', openapi.IN_FORM, type=openapi.TYPE_FILE, required=True, description="Jadval fayli (PDF, DOCX, XLSX va h.k.)"),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False, default=0),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False, default=True),
+        ],
+        consumes=['multipart/form-data'],
+        responses={
+            201: DarsJadvaliSerializer,
+            400: openapi.Response(description="Validatsiya xatosi"),
+        },
+        tags=['Dars Jadvali'],
+    )
+    def post(self, request, *args, **kwargs):
+        serializer = DarsJadvaliWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(
+            DarsJadvaliSerializer(obj, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class DarsJadvaliDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Bitta dars jadvali — ko'rish, tahrirlash, o'chirish."""
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = DarsJadvali.objects.all()
+
+    def get_serializer_class(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return DarsJadvaliSerializer
+        if self.request.method in ('PUT', 'PATCH'):
+            return DarsJadvaliWriteSerializer
+        return DarsJadvaliSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Dars jadvali detali",
+        manual_parameters=[LANG_PARAM],
+        responses={200: DarsJadvaliSerializer},
+        tags=['Dars Jadvali'],
+    )
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object()
+        lang = request.query_params.get('lang')
+        data = DarsJadvaliSerializer(obj, context={'request': request}).data
+        return Response(apply_lang_filter(data, lang))
+
+    @swagger_auto_schema(
+        operation_summary="Dars jadvalini to'liq yangilash",
+        manual_parameters=[
+            openapi.Parameter('title_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=True, description="Nomi (UZ)"),
+            openapi.Parameter('title_uz_cyrl', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (UZ Kirill)"),
+            openapi.Parameter('title_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (RU)"),
+            openapi.Parameter('title_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (EN)"),
+            openapi.Parameter('file', openapi.IN_FORM, type=openapi.TYPE_FILE, required=False, description="Jadval fayli"),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False),
+        ],
+        consumes=['multipart/form-data'],
+        responses={200: DarsJadvaliSerializer},
+        tags=['Dars Jadvali'],
+    )
+    def put(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = DarsJadvaliWriteSerializer(obj, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(DarsJadvaliSerializer(obj, context={'request': request}).data)
+
+    @swagger_auto_schema(
+        operation_summary="Dars jadvalini qisman yangilash",
+        manual_parameters=[
+            openapi.Parameter('title_uz', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (UZ)"),
+            openapi.Parameter('title_uz_cyrl', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (UZ Kirill)"),
+            openapi.Parameter('title_ru', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (RU)"),
+            openapi.Parameter('title_en', openapi.IN_FORM, type=openapi.TYPE_STRING, required=False, description="Nomi (EN)"),
+            openapi.Parameter('file', openapi.IN_FORM, type=openapi.TYPE_FILE, required=False, description="Jadval fayli"),
+            openapi.Parameter('sort_order', openapi.IN_FORM, type=openapi.TYPE_INTEGER, required=False),
+            openapi.Parameter('is_active', openapi.IN_FORM, type=openapi.TYPE_BOOLEAN, required=False),
+        ],
+        consumes=['multipart/form-data'],
+        responses={200: DarsJadvaliSerializer},
+        tags=['Dars Jadvali'],
+    )
+    def patch(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = DarsJadvaliWriteSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        return Response(DarsJadvaliSerializer(obj, context={'request': request}).data)
+
+    @swagger_auto_schema(
+        operation_summary="Dars jadvalini o'chirish",
+        responses={200: openapi.Response(description="O'chirildi")},
+        tags=['Dars Jadvali'],
+    )
+    def delete(self, request, *args, **kwargs):
+        obj = self.get_object()
+        title = obj.title_uz or obj.title_ru or obj.title_en or ''
+        obj.delete()
+        return Response(
+            {'id': obj.id, 'title': title, 'detail': "Dars jadvali muvaffaqiyatli o'chirildi."},
             status=status.HTTP_200_OK,
         )

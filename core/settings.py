@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'gallery',
     'structure',
     'content',
+    'library',
 ]
 
 MIDDLEWARE = [

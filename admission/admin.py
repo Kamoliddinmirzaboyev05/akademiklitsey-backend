@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 from django.utils.html import format_html, mark_safe
 from django import forms
 from datetime import date
-from .models import AdmissionInfo, AdmissionSubject, AdmissionDocument, FAQ
+from .models import AdmissionInfo, AdmissionSubject, AdmissionDocument, FAQ, DarsJadvali
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -282,4 +282,38 @@ class FAQAdmin(admin.ModelAdmin):
         form = super().get_form(request, obj, **kwargs)
         form.base_fields['question_uz'].required = True
         form.base_fields['answer_uz'].required = True
+        return form
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DarsJadvali
+# ─────────────────────────────────────────────────────────────────────────────
+
+@admin.register(DarsJadvali)
+class DarsJadvaliAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'file_link', 'is_active', 'sort_order', 'updated_at']
+    list_filter = ['is_active']
+    search_fields = ['title_uz', 'title_ru', 'title_en']
+    list_editable = ['is_active', 'sort_order']
+    ordering = ['sort_order']
+    readonly_fields = ['created_at', 'updated_at']
+
+    fieldsets = (
+        ("O'zbek tili (Lotin)", {'fields': ('title_uz',)}),
+        ("O'zbek tili (Kirill)", {'fields': ('title_uz_cyrl',), 'classes': ('collapse',)}),
+        ("Rus tili", {'fields': ('title_ru',), 'classes': ('collapse',)}),
+        ("Ingliz tili", {'fields': ('title_en',), 'classes': ('collapse',)}),
+        ("Fayl va sozlamalar", {'fields': ('file', 'sort_order', 'is_active')}),
+        ("Tizim", {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
+    )
+
+    def file_link(self, obj):
+        if obj.file:
+            return mark_safe(f'<a href="{obj.file.url}" target="_blank">📄 Fayl</a>')
+        return mark_safe('<span style="color:#999;">— Fayl yo\'q</span>')
+    file_link.short_description = 'Fayl'
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.base_fields['title_uz'].required = True
         return form

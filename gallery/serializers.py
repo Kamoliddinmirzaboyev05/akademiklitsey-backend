@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import GalleryAlbum, GalleryPhoto, UsefulLink
+from .models import GalleryAlbum, GalleryPhoto, UsefulLink, InfrastructureItem, Video
+from core.validators import validate_image, validate_video
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
 
@@ -67,12 +68,18 @@ class GalleryPhotoUploadSerializer(serializers.Serializer):
     multipart/form-data orqali yuboriladi.
     """
     image = serializers.ImageField(
-        help_text="Asosiy rasm (majburiy). JPEG, PNG, WEBP."
+        help_text="Asosiy rasm (majburiy). JPEG, PNG, WEBP. Maks: 8 MB."
     )
     thumbnail = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="Kichik preview rasm (ixtiyoriy). Yo'q bo'lsa image ishlatiladi."
+        help_text="Kichik preview rasm (ixtiyoriy). Maks: 8 MB."
     )
+
+    def validate_image(self, value):
+        return validate_image(value)
+
+    def validate_thumbnail(self, value):
+        return validate_image(value)
     caption = serializers.CharField(
         max_length=500, required=False, allow_blank=True, allow_null=True,
         help_text="Rasm izohi (ixtiyoriy)"
@@ -177,8 +184,11 @@ class GalleryAlbumWriteSerializer(serializers.Serializer):
     )
     cover_image = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="Muqova rasmi (multipart/form-data)"
+        help_text="Muqova rasmi (multipart/form-data). Maks: 8 MB."
     )
+
+    def validate_cover_image(self, value):
+        return validate_image(value)
     event_date = serializers.DateField(
         required=False, allow_null=True,
         help_text="Tadbir sanasi (YYYY-MM-DD)"
@@ -247,8 +257,11 @@ class UsefulLinkWriteSerializer(serializers.Serializer):
     )
     logo = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="Logo rasmi (ixtiyoriy, multipart/form-data)"
+        help_text="Logo rasmi (ixtiyoriy, multipart/form-data). Maks: 8 MB."
     )
+
+    def validate_logo(self, value):
+        return validate_image(value)
     description = serializers.CharField(
         max_length=300, required=False, allow_blank=True, allow_null=True,
         help_text="Qisqa tavsif (ixtiyoriy)"
@@ -258,6 +271,198 @@ class UsefulLinkWriteSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         return UsefulLink.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# InfrastructureItem
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InfrastructureItemSerializer(serializers.Serializer):
+    """Read serializer — ro'yxat va detail uchun."""
+    id = serializers.IntegerField(read_only=True)
+    translations = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    sort_order = serializers.IntegerField()
+    is_active = serializers.BooleanField()
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+    def get_translations(self, obj):
+        return build_translations(obj, ['title', 'description'])
+
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        return None
+
+
+class InfrastructureItemWriteSerializer(serializers.Serializer):
+    """
+    Write serializer. Har bir til maydoni alohida flat field.
+    image — multipart/form-data orqali yuboriladi.
+    Kamida bitta tilda title_* to'ldirilishi shart.
+    """
+    title_uz = serializers.CharField(
+        max_length=300, required=False, allow_blank=True,
+        help_text="Nomi (O'zbek lotin)"
+    )
+    title_uz_cyrl = serializers.CharField(
+        max_length=300, required=False, allow_blank=True,
+        help_text="Nomi (O'zbek kirill)"
+    )
+    title_ru = serializers.CharField(
+        max_length=300, required=False, allow_blank=True,
+        help_text="Nomi (Rus)"
+    )
+    title_en = serializers.CharField(
+        max_length=300, required=False, allow_blank=True,
+        help_text="Nomi (Ingliz)"
+    )
+    description_uz = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text="Tavsif (O'zbek lotin)"
+    )
+    description_uz_cyrl = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text="Tavsif (O'zbek kirill)"
+    )
+    description_ru = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text="Tavsif (Rus)"
+    )
+    description_en = serializers.CharField(
+        required=False, allow_blank=True,
+        help_text="Tavsif (Ingliz)"
+    )
+    image = serializers.ImageField(
+        required=False, allow_null=True,
+        help_text="Rasm (multipart/form-data). Maks: 8 MB."
+    )
+
+    def validate_image(self, value):
+        return validate_image(value)
+    sort_order = serializers.IntegerField(default=0)
+    is_active = serializers.BooleanField(default=True)
+
+    def validate(self, data):
+        if self.partial:
+            instance = self.instance
+            titles = [
+                data.get(f'title_{l}') or (getattr(instance, f'title_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            titles = [data.get(f'title_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
+        if not any(titles):
+            raise serializers.ValidationError(
+                "Kamida bitta tilda nom kiritilishi shart (title_uz, title_ru yoki title_en)."
+            )
+        if not self.instance and not data.get('image'):
+            raise serializers.ValidationError("Rasm (image) majburiy.")
+        return data
+
+    def create(self, validated_data):
+        return InfrastructureItem.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Video
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class VideoSerializer(serializers.Serializer):
+    """Read serializer — video ro'yxati va detail uchun."""
+    id = serializers.IntegerField(read_only=True)
+    translations = serializers.SerializerMethodField()
+    video_file = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
+    sort_order = serializers.IntegerField()
+    is_active = serializers.BooleanField()
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+    def get_translations(self, obj):
+        return build_translations(obj, ['title', 'description'])
+
+    def get_video_file(self, obj):
+        if obj.video_file:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.video_file.url) if request else obj.video_file.url
+        return None
+
+    def get_thumbnail(self, obj):
+        if obj.thumbnail:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.thumbnail.url) if request else obj.thumbnail.url
+        return None
+
+
+class VideoWriteSerializer(serializers.Serializer):
+    """
+    Write serializer. Har bir til maydoni alohida flat field.
+    video_file va thumbnail — multipart/form-data orqali yuboriladi.
+    Kamida bitta tilda title_* va video_file (yangi yaratishda) majburiy.
+    Video hajmi max 500 MB, faqat mp4/webm/avi/mov formatlari qabul qilinadi.
+    """
+    title_uz = serializers.CharField(max_length=300, required=False, allow_blank=True, help_text="Sarlavha (O'zbek lotin)")
+    title_uz_cyrl = serializers.CharField(max_length=300, required=False, allow_blank=True, help_text="Sarlavha (O'zbek kirill)")
+    title_ru = serializers.CharField(max_length=300, required=False, allow_blank=True, help_text="Sarlavha (Rus)")
+    title_en = serializers.CharField(max_length=300, required=False, allow_blank=True, help_text="Sarlavha (Ingliz)")
+
+    description_uz = serializers.CharField(required=False, allow_blank=True, help_text="Tavsif (O'zbek lotin)")
+    description_uz_cyrl = serializers.CharField(required=False, allow_blank=True, help_text="Tavsif (O'zbek kirill)")
+    description_ru = serializers.CharField(required=False, allow_blank=True, help_text="Tavsif (Rus)")
+    description_en = serializers.CharField(required=False, allow_blank=True, help_text="Tavsif (Ingliz)")
+
+    video_file = serializers.FileField(
+        required=False, allow_null=True,
+        help_text="Video fayl — mp4, webm, avi, mov. Maksimal hajm: 500 MB."
+    )
+    thumbnail = serializers.ImageField(
+        required=False, allow_null=True,
+        help_text="Muqova rasmi (ixtiyoriy, multipart/form-data). Maks: 8 MB."
+    )
+    sort_order = serializers.IntegerField(default=0)
+    is_active = serializers.BooleanField(default=True)
+
+    def validate_video_file(self, value):
+        return validate_video(value)
+
+    def validate_thumbnail(self, value):
+        return validate_image(value)
+
+    def validate(self, data):
+        if self.partial:
+            instance = self.instance
+            titles = [
+                data.get(f'title_{l}') or (getattr(instance, f'title_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            titles = [data.get(f'title_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
+        if not any(titles):
+            raise serializers.ValidationError(
+                "Kamida bitta tilda sarlavha kiritilishi shart (title_uz, title_ru yoki title_en)."
+            )
+        if not self.instance and not data.get('video_file'):
+            raise serializers.ValidationError("Video fayl (video_file) majburiy.")
+        return data
+
+    def create(self, validated_data):
+        return Video.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():

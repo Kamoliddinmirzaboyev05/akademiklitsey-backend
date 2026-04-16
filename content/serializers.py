@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import News, Announcement
+from core.validators import validate_image
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
 NEWS_FIELDS = ['title', 'short_description', 'content']
@@ -126,7 +127,7 @@ class NewsWriteSerializer(serializers.Serializer):
     # Umumiy maydonlar
     image = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="Asosiy rasm (multipart/form-data)"
+        help_text="Asosiy rasm (multipart/form-data). Maks: 8 MB. Formatlar: jpg, png, webp."
     )
     status = serializers.ChoiceField(
         choices=News.Status.choices,
@@ -141,6 +142,9 @@ class NewsWriteSerializer(serializers.Serializer):
         required=False, allow_null=True,
         help_text="Nashr sanasi (bo'sh qoldirilsa status=published da avtomatik to'ldiriladi)"
     )
+
+    def validate_image(self, value):
+        return validate_image(value)
 
     def validate(self, data):
         if self.partial:
@@ -260,7 +264,7 @@ class AnnouncementWriteSerializer(serializers.Serializer):
     # Umumiy maydonlar
     image = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="Asosiy rasm (multipart/form-data)"
+        help_text="Asosiy rasm (multipart/form-data). Maks: 8 MB. Formatlar: jpg, png, webp."
     )
     status = serializers.ChoiceField(
         choices=Announcement.Status.choices,
@@ -279,6 +283,9 @@ class AnnouncementWriteSerializer(serializers.Serializer):
         required=False, allow_null=True,
         help_text="Nashr sanasi (bo'sh qoldirilsa status=published da avtomatik)"
     )
+
+    def validate_image(self, value):
+        return validate_image(value)
 
     def validate(self, data):
         if self.partial:

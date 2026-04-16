@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Circle
+from core.validators import validate_image
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
 
@@ -146,13 +147,16 @@ class CircleWriteSerializer(serializers.Serializer):
     )
     photo = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="To'garak rasmi (ixtiyoriy, multipart/form-data)"
+        help_text="To'garak rasmi (ixtiyoriy, multipart/form-data). Maks: 8 MB."
     )
     is_active = serializers.BooleanField(default=True)
     sort_order = serializers.IntegerField(default=0)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def validate_photo(self, value):
+        return validate_image(value)
 
     def validate_teacher(self, value):
         if value is None:

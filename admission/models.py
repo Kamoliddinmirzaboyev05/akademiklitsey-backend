@@ -137,6 +137,40 @@ class AdmissionDocument(models.Model):
         return self.document_name_uz or self.document_name_ru or self.document_name_en or f"Document #{self.pk}"
 
 
+class DarsJadvali(models.Model):
+    """
+    Dars jadvali yozuvlari: har birida title + bitta fayl.
+    Masalan: "1-kurs", "2-kurs" va h.k.
+    """
+    title_uz = models.CharField(max_length=300, blank=True, verbose_name="Nomi (UZ)")
+    title_uz_cyrl = models.CharField(max_length=300, blank=True, verbose_name="Nomi (UZ Kirill)")
+    title_ru = models.CharField(max_length=300, blank=True, verbose_name="Nomi (RU)")
+    title_en = models.CharField(max_length=300, blank=True, verbose_name="Nomi (EN)")
+
+    file = models.FileField(
+        upload_to='dars_jadvali/',
+        verbose_name="Jadval fayli",
+        help_text="PDF, DOCX, XLSX va h.k."
+    )
+    sort_order = models.IntegerField(default=0, verbose_name="Tartib")
+    is_active = models.BooleanField(default=True, verbose_name="Faol")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'dars_jadvali'
+        verbose_name = "Dars jadvali"
+        verbose_name_plural = "Dars jadvallari"
+        ordering = ['sort_order']
+        indexes = [
+            models.Index(fields=['sort_order']),
+            models.Index(fields=['is_active']),
+        ]
+
+    def __str__(self):
+        return self.title_uz or self.title_ru or self.title_en or f"Jadval #{self.pk}"
+
+
 class FAQ(models.Model):
     class Category(models.TextChoices):
         ADMISSION = 'admission', 'Qabul'

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import SiteSettings, Slider
+from core.validators import validate_image
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
 TRANS_FIELDS = ['short_name', 'full_name', 'address']
@@ -133,7 +134,7 @@ class SiteSettingsWriteSerializer(serializers.Serializer):
     )
     logo = serializers.ImageField(
         required=False, allow_null=True,
-        help_text="Logo rasmi (multipart/form-data)"
+        help_text="Logo rasmi (multipart/form-data). Maks: 8 MB."
     )
     # Ijtimoiy tarmoqlar
     telegram = serializers.URLField(
@@ -152,6 +153,9 @@ class SiteSettingsWriteSerializer(serializers.Serializer):
         required=False, allow_blank=True, allow_null=True,
         help_text="YouTube kanal URL"
     )
+
+    def validate_logo(self, value):
+        return validate_image(value)
 
     def validate(self, data):
         # Yaratishda (instance yo'q) kamida bitta tilda short_name va full_name shart
@@ -219,7 +223,7 @@ class SliderSerializer(serializers.ModelSerializer):
 
 class SliderWriteSerializer(serializers.Serializer):
     """Write serializer — flat fields, image multipart."""
-    image = serializers.ImageField(required=False, allow_null=True)
+    image = serializers.ImageField(required=False, allow_null=True, help_text="Slider rasmi. Maks: 8 MB.")
 
     title_uz      = serializers.CharField(max_length=200, required=False, allow_blank=True)
     title_uz_cyrl = serializers.CharField(max_length=200, required=False, allow_blank=True)
@@ -233,6 +237,9 @@ class SliderWriteSerializer(serializers.Serializer):
 
     sort_order = serializers.IntegerField(required=False, min_value=1, default=1)
     is_active  = serializers.BooleanField(required=False, default=True)
+
+    def validate_image(self, value):
+        return validate_image(value)
 
     def validate(self, data):
         # Yaratishda rasm majburiy

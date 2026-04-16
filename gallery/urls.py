@@ -7,6 +7,10 @@ from .views import (
     GalleryPhotoDetailView,
     UsefulLinkListView,
     UsefulLinkDetailView,
+    InfrastructureListCreateView,
+    InfrastructureDetailView,
+    VideoListCreateView,
+    VideoDetailView,
 )
 
 app_name = 'gallery'
@@ -45,4 +49,19 @@ urlpatterns = [
     # PATCH  — qisman yangilash (admin)
     # DELETE — o'chirish (admin)
     path('useful-links/<int:pk>/', UsefulLinkDetailView.as_view(), name='useful-link-detail'),
+
+    # ─── Infrastructure — Moddiy-texnik baza ─────────────────────────────────
+    path('infrastructure/', InfrastructureListCreateView.as_view(), name='infrastructure-list'),
+    path('infrastructure/<int:pk>/', InfrastructureDetailView.as_view(), name='infrastructure-detail'),
+
+    # ─── Videos — Video lavhalar ──────────────────────────────────────────────
+    # GET  — videolar ro'yxati (filter, search, pagination)
+    # POST — yangi video yaratish (admin)
+    path('videos/', VideoListCreateView.as_view(), name='video-list'),
+
+    # GET    — bitta video
+    # PUT    — to'liq yangilash (admin)
+    # PATCH  — qisman yangilash (admin)
+    # DELETE — o'chirish (admin)
+    path('videos/<int:pk>/', VideoDetailView.as_view(), name='video-detail'),
 ]

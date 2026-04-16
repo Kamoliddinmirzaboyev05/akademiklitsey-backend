@@ -1,5 +1,6 @@
 ﻿from rest_framework import serializers
-from .models import AdmissionInfo, AdmissionSubject, AdmissionDocument, FAQ
+from .models import AdmissionInfo, AdmissionSubject, AdmissionDocument, FAQ, DarsJadvali
+from core.validators import validate_document
 
 LANGS = ['uz', 'uz_cyrl', 'ru', 'en']
 
@@ -148,9 +149,15 @@ class AdmissionDocumentWriteSerializer(serializers.Serializer):
     note_uz_cyrl = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
     note_ru = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
     note_en = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
-    document_file = serializers.FileField(required=False, allow_null=True)
+    document_file = serializers.FileField(
+        required=False, allow_null=True,
+        help_text="Hujjat fayli (PDF, DOCX va h.k.). Maks: 30 MB."
+    )
     is_required = serializers.BooleanField(default=True)
     sort_order = serializers.IntegerField(default=0)
+
+    def validate_document_file(self, value):
+        return validate_document(value)
 
     def validate(self, data):
         names = [
@@ -226,7 +233,70 @@ class FAQWriteSerializer(serializers.Serializer):
         return instance
 
 
-# в”Ђв”Ђв”Ђ Combined в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# ─────────────────────────────────────────────────────────────────────────────
+# DarsJadvali
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DarsJadvaliSerializer(serializers.Serializer):
+    """Read serializer."""
+    id = serializers.IntegerField(read_only=True)
+    translations = serializers.SerializerMethodField()
+    file = serializers.SerializerMethodField()
+    sort_order = serializers.IntegerField()
+    is_active = serializers.BooleanField()
+    created_at = serializers.DateTimeField()
+    updated_at = serializers.DateTimeField()
+
+    def get_translations(self, obj):
+        return build_translations(obj, ['title'])
+
+    def get_file(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+        return None
+
+
+class DarsJadvaliWriteSerializer(serializers.Serializer):
+    """Write serializer — multipart/form-data."""
+    title_uz = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    title_uz_cyrl = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    title_ru = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    title_en = serializers.CharField(max_length=300, required=False, allow_blank=True)
+    file = serializers.FileField(
+        required=False, allow_null=True,
+        help_text="Jadval fayli (PDF, DOCX, XLSX). Maks: 30 MB."
+    )
+    sort_order = serializers.IntegerField(default=0)
+    is_active = serializers.BooleanField(default=True)
+
+    def validate_file(self, value):
+        return validate_document(value)
+
+    def validate(self, data):
+        if self.partial:
+            instance = self.instance
+            titles = [
+                data.get(f'title_{l}') or (getattr(instance, f'title_{l}', '') if instance else '')
+                for l in ['uz', 'ru', 'en', 'uz_cyrl']
+            ]
+        else:
+            titles = [data.get(f'title_{l}', '') for l in ['uz', 'ru', 'en', 'uz_cyrl']]
+        if not any(titles):
+            raise serializers.ValidationError("Kamida bitta tilda jadval nomi kiritilishi shart.")
+        if not self.partial and not data.get('file'):
+            raise serializers.ValidationError("Jadval fayli majburiy.")
+        return data
+
+    def create(self, validated_data):
+        return DarsJadvali.objects.create(**validated_data)
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
 
 class AdmissionCurrentSerializer(serializers.Serializer):
     admission_info = AdmissionInfoSerializer()

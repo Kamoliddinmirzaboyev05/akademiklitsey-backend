@@ -3,7 +3,8 @@ from .views import (
     AdmissionCurrentView, AdmissionHistoryView,
     AdmissionSubjectsView, AdmissionSubjectDetailView,
     AdmissionDocumentsView, AdmissionDocumentDetailView,
-    FAQListView, FAQFeaturedView, FAQDetailView
+    FAQListView, FAQFeaturedView, FAQDetailView,
+    DarsJadvaliListView, DarsJadvaliDetailView,
 )
 
 app_name = 'admission'
@@ -25,4 +26,8 @@ urlpatterns = [
     path('faqs/', FAQListView.as_view(), name='faq-list'),
     path('faqs/featured/', FAQFeaturedView.as_view(), name='faq-featured'),
     path('faqs/<int:pk>/', FAQDetailView.as_view(), name='faq-detail'),
+
+    # Dars jadvali
+    path('dars-jadvali/', DarsJadvaliListView.as_view(), name='dars-jadvali-list'),
+    path('dars-jadvali/<int:pk>/', DarsJadvaliDetailView.as_view(), name='dars-jadvali-detail'),
 ]
